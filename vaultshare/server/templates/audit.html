@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}审核日志 · VaultShare{% endblock %}
+{% block content %}
+<h1>审核日志</h1>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>最近 {{ events|length }} 条</h2>
+    <span class="muted small">显示上限 {{ limit }} 条</span>
+  </div>
+  {% if events %}
+  <table class="audit">
+    <thead>
+      <tr>
+        <th>时间（UTC）</th>
+        <th>事件</th>
+        <th>对象</th>
+        <th>操作者 / 来源</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td class="nowrap">{{ e.ts_text }}</td>
+        <td><strong>{{ e.event }}</strong>
+          {% if e.code %}<span class="tag">{{ e.code }}</span>{% endif %}
+        </td>
+        <td>
+          {% if e.package_id %}<code>{{ e.package_id }}</code><br>{% endif %}
+          {% if e.grant_id %}<span class="small muted">grant</span> <code>{{ e.grant_id }}</code><br>{% endif %}
+          {% if e.request_id %}<span class="small muted">request</span> <code>{{ e.request_id }}</code><br>{% endif %}
+          {% if e.count is defined %}<span class="small">数量 {{ e.count }}</span>{% endif %}
+          {% if e.replayed is defined %}<span class="small muted">重放 {{ e.replayed }}</span>{% endif %}
+        </td>
+        <td>
+          {% if e.by %}<span class="small">{{ e.by }}</span><br>{% endif %}
+          {% if e.ip %}<span class="small muted">{{ e.ip }}</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">只显示最近的日志；完整记录在 <code>data/audit.jsonl</code>。</p>
+  {% else %}
+  <p class="muted">暂无审计事件。</p>
+  {% endif %}
+</div>
+{% endblock %}

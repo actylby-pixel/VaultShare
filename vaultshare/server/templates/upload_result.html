@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}上传完成 · VaultShare{% endblock %}
+{% block content %}
+<h1>上传完成</h1>
+
+<div class="flash ok">
+  {% if result.payload_mode == 'local' %}共享包已创建，口令已经生成（密文未上传）。
+  {% else %}共享包已创建并上传，口令已经生成。{% endif %}
+  <strong>明文口令只显示这一次</strong>，离开本页后需要在本机用发送方私钥重新
+  解开，请现在保存。
+</div>
+
+<div class="panel">
+  <h2>口令</h2>
+  {% if note %}
+  <p><span class="muted">包备注：</span><span class="note-text">{{ note }}</span></p>
+  {% endif %}
+  <form method="post" action="{{ url_for('web.update_grant_notes', package_id=result.package_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <table>
+      <thead>
+        <tr>
+          <th>口令</th>
+          <th>次数</th>
+          <th>到期（UTC）</th>
+          <th>grant_id</th>
+          <th>备注</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in result.codes %}
+        <tr>
+          <td><code class="code-value">{{ c.formatted }}</code></td>
+          <td>{{ c.used }} / {{ c.max_uses }}</td>
+          <td>{{ c.expires_text }}</td>
+          <td><code>{{ c.grant_id }}</code></td>
+          <td><input type="text" name="note_{{ c.grant_id }}" maxlength="500" placeholder="可选"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button class="small" type="submit">保存这些备注</button>
+    <p class="muted small">
+      保存后会跳到包详情页，<strong>明文口令不会再次显示</strong>，请先复制口令。
+    </p>
+  </form>
+  <p class="muted small">
+    每一行都可以单独发给接收方；对方输入口令后由服务器联系密钥代理兑换。
+    不要把口令和 <code>payload.vspk</code> 发给同一个人以外的人。
+  </p>
+</div>
+
+<div class="panel">
+  <h2>包信息</h2>
+  <dl class="kv">
+    <dt>package_id</dt><dd><code>{{ result.package_id }}</code></dd>
+    <dt>交付方式</dt>
+    <dd>{% if result.payload_mode == 'local' %}本地交付（密文不经服务器）
+      {% else %}服务器交付{% endif %}</dd>
+    <dt>容器内服务器地址</dt><dd><code>{{ result.server }}</code></dd>
+    <dt>payload 大小</dt>
+    <dd>{% if result.payload_mode == 'local' %}不适用（本地交付）
+      {% else %}{{ result.payload_size }} 字节{% endif %}</dd>
+    <dt>Policy 摘要</dt><dd><code>{{ result.policy_hash }}</code></dd>
+    <dt>代理指纹</dt><dd><code>{{ result.broker_fingerprint }}</code></dd>
+    <dt>本次新建</dt><dd>{{ '是（首次上传）' if result.created else '否（复用了已有包）' }}</dd>
+  </dl>
+  <p><a href="{{ url_for('web.package_detail', package_id=result.package_id) }}">打开包详情 →</a></p>
+</div>
+
+<div class="panel">
+  <h2>接下来</h2>
+  <ol class="steps">
+    <li>把 <code>payload.vspk</code> 发给接收方（任意渠道）。{% if result.payload_mode == 'local' %}
+      本包是本地交付，请使用你自己保留的那份容器，不要指望服务器重新下载。{% endif %}</li>
+    <li>把其中一条口令通过另一个可信渠道告诉对方。</li>
+    <li>对方用解密工具同选容器并输入口令即可；服务器地址自动填充。</li>
+  </ol>
+  <p class="muted small">
+    以后要再次查看口令，请在持有 <code>sender.key</code> 的机器上运行
+    <code>vaultshare codes --package {{ result.package_id }} --identity sender --server URL</code>。
+  </p>
+</div>
+{% endblock %}

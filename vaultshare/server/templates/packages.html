@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}共享包 · VaultShare{% endblock %}
+{% block content %}
+<h1>共享包</h1>
+
+{% if state.degraded %}
+<div class="flash error">
+  <strong>状态处于降级模式：</strong>{{ state.reason }}。只读展示，兑换与写操作已暂停。
+</div>
+{% endif %}
+
+<div class="panel">
+  <div class="panel-head">
+    <h2>全部包（{{ packages|length }}）</h2>
+    {% if web_upload_enabled %}
+    <a class="button" href="{{ url_for('web.upload') }}">上传新共享包</a>
+    {% endif %}
+  </div>
+  {% if packages %}
+  <table>
+    <thead>
+      <tr>
+        <th>package_id</th>
+        <th>备注</th>
+        <th>状态</th>
+        <th>创建时间（UTC）</th>
+        <th>口令</th>
+        <th>已用 / 已分配</th>
+        <th>文件</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in packages %}
+      <tr>
+        <td><a href="{{ url_for('web.package_detail', package_id=p.package_id) }}"><code>{{ p.package_id }}</code></a></td>
+        <td class="note-cell" title="{{ p.note }}">{{ p.note }}</td>
+        <td>
+          {% if p.status == 'active' %}<span class="tag ok">有效</span>
+          {% else %}<span class="tag bad">{{ p.status }}</span>{% endif %}
+        </td>
+        <td>{{ p.created_text }}</td>
+        <td>{{ p.issued }}</td>
+        <td>{{ p.used }} / {{ p.allocated_uses }}</td>
+        <td>
+          {% if p.payload_mode == 'local' %}<span class="tag ok">本地交付</span>
+          {% elif p.has_payload %}<span class="tag ok">已上传</span>
+          {% else %}<span class="tag">未上传</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">还没有共享包。</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>命令行上传</h2>
+  <pre class="code">vaultshare broker info --server URL --fingerprint SHA256 --out broker-identity.json
+vaultshare encrypt ./资料 --identity sender --server URL --out ./pkg
+vaultshare upload ./pkg --server URL --identity sender --broker-identity broker-identity.json \
+         --codes 2 --max-uses 3 --expires 7d
+# 不上传密文（发送方直接把 payload.vspk 交给接收方）：
+vaultshare upload ./pkg ... --local-payload</pre>
+  <p class="muted small">网页上传如需启用，请设置 <code>VAULTSHARE_WEB_UPLOAD=1</code>，并先阅读安全说明。
+    网页上传也可以勾选“本地交付”而不上传密文；但浏览器仍会把你选中的文件发给
+    Web 进程，大文件建议用上面的命令行 <code>--local-payload</code>（完全不传输密文）。</p>
+</div>
+{% endblock %}

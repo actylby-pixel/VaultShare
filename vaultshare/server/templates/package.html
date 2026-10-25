@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}包 {{ package_id[:8] }} · VaultShare{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('web.packages') }}">← 返回包列表</a></p>
+<h1>共享包</h1>
+<p class="mono big">{{ package_id }}</p>
+
+{% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+{% if state.degraded %}
+<div class="flash error">状态处于降级模式：{{ state.reason }}。只读展示，兑换与写操作被暂停。</div>
+{% endif %}
+{% if context_error %}
+<div class="flash error">一致性检查失败：{{ context_error }}</div>
+{% endif %}
+
+<div class="panel">
+  <h2>元数据</h2>
+  <dl class="kv">
+    <dt>状态</dt><dd>{{ package_view.status }}</dd>
+    <dt>创建时间（UTC）</dt><dd>{{ package_view.created_text }}</dd>
+    <dt>发送方 key_id</dt><dd><code>{{ package_view.sender_key_id }}</code>
+      {% if sender %}<span class="muted small">（{{ sender.identity_hash }}）</span>{% endif %}</dd>
+    <dt>代理 key_id</dt><dd><code>{{ package_view.broker_key_id }}</code></dd>
+    <dt>交付方式</dt>
+    <dd>{% if package_view.payload_mode == 'local' %}本地交付（密文不经服务器）
+      {% else %}服务器交付{% endif %}</dd>
+    <dt>payload SHA-256</dt>
+    <dd>{% if package_view.payload_mode == 'local' %}<span class="muted">不适用（本地交付）</span>
+      {% else %}<code>{{ package_view.payload_sha256 or '未上传' }}</code>{% endif %}</dd>
+    <dt>KeyConfig SHA-256</dt><dd><code>{{ package_view.keyconfig_sha256 }}</code></dd>
+    <dt>Policy SHA-256</dt><dd><code>{{ package_view.policy_sha256 }}</code></dd>
+    <dt>累计</dt><dd>签发 {{ metrics.issued }} 个，分配 {{ metrics.allocated_uses }} 次，已用 {{ metrics.used }} 次</dd>
+  </dl>
+
+  <h3>包备注</h3>
+  <p class="note-text">{% if package_note %}{{ package_note }}{% else %}<span class="muted">（无）</span>{% endif %}</p>
+  <form method="post" action="{{ url_for('web.update_package_note', package_id=package_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <textarea name="note" rows="2" maxlength="500" placeholder="例如：给谁的、内容说明">{{ package_note }}</textarea>
+    <button class="small" type="submit">保存包备注</button>
+  </form>
+  <p class="muted small">备注只在本站展示，不参与加密、签名或授权，删除备注不影响口令。</p>
+</div>
+
+<div class="panel">
+  <h2>口令</h2>
+  {% if grants %}
+  <form id="grant-notes-form" method="post"
+        action="{{ url_for('web.update_grant_notes', package_id=package_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  </form>
+  <table>
+    <thead>
+      <tr>
+        <th>grant_id</th>
+        <th>备注</th>
+        <th>创建</th>
+        <th>到期</th>
+        <th>次数</th>
+        <th>状态</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in grants %}
+      <tr>
+        <td><code>{{ g.grant_id }}</code></td>
+        <td><input form="grant-notes-form" type="text" name="note_{{ g.grant_id }}"
+                   value="{{ g.note }}" maxlength="500" placeholder="可选"></td>
+        <td>{{ g.created_text }}</td>
+        <td>{{ g.expires_text }}{% if g.expired %} <span class="tag bad">已过期</span>{% endif %}</td>
+        <td>{{ g.used }} / {{ g.max_uses }}</td>
+        <td>
+          {% if g.revoked %}<span class="tag bad">撤销</span>
+          {% elif g.used >= g.max_uses %}<span class="tag">用尽</span>
+          {% else %}<span class="tag ok">可用</span>{% endif %}
+        </td>
+        <td>
+          {% if not g.revoked and package_view.status == 'active' %}
+          <form class="inline" method="post"
+                action="{{ url_for('web.revoke_grant', package_id=package_id, grant_id=g.grant_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="danger small">撤销</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button form="grant-notes-form" class="small" type="submit">保存口令备注</button>
+  <p class="muted small">明文口令不在此页面显示；请用 <code>vaultshare codes</code> 在持有发送方私钥的机器上查看。</p>
+  {% else %}
+  <p class="muted">尚未创建口令。</p>
+  {% endif %}
+</div>
+
+{% if package_view.status == 'active' %}
+<div class="panel">
+  <h2>增加口令</h2>
+  {% if web_upload_enabled %}
+  <p class="muted small">
+    在撤销整个包之前，可以继续签发新口令。数量受签名策略里的“口令总数上限”约束；
+    需要上传发送方身份文件与私钥口令，明文口令只显示一次。
+  </p>
+  <form method="post" action="{{ url_for('web.add_grants', package_id=package_id) }}"
+        enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="grants_identity_files">发送方身份文件</label>
+    <input id="grants_identity_files" type="file" name="identity_files" multiple required>
+    <p class="muted small">成对的 <code>sender.json</code> 与 <code>sender.key</code>（各一个）。</p>
+
+    <label for="grants_password">发送方私钥口令</label>
+    <input id="grants_password" type="password" name="identity_password" required autocomplete="off">
+
+    <div class="form-grid">
+      <div>
+        <label for="grants_codes">新增口令数</label>
+        <input id="grants_codes" type="text" name="codes" value="{{ form.codes or '1' }}" inputmode="numeric">
+      </div>
+      <div>
+        <label for="grants_max_uses">每个口令可用次数</label>
+        <input id="grants_max_uses" type="text" name="max_uses" value="{{ form.max_uses or '1' }}" inputmode="numeric">
+      </div>
+      <div>
+        <label for="grants_expires">有效期</label>
+        <input id="grants_expires" type="text" name="expires" value="{{ form.expires or '7d' }}">
+        <p class="muted small">不能超过创建包时写入策略的最晚到期时间。</p>
+      </div>
+    </div>
+    <button class="primary" type="submit">生成新口令</button>
+  </form>
+  {% else %}
+  <p class="muted">
+    网页上传未启用，无法在网页新增口令（显示明文需要发送方私钥）。
+    设置 <code>VAULTSHARE_WEB_UPLOAD=1</code> 并重启后可用。
+  </p>
+  {% endif %}
+</div>
+
+<div class="panel danger-zone">
+  <h2>撤销整个包</h2>
+  <p>撤销后该包及其全部口令立即失效，已消耗的额度不会恢复。此操作不可在网页上撤销。</p>
+  <form method="post" action="{{ url_for('web.revoke_package', package_id=package_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="danger">撤销该包</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

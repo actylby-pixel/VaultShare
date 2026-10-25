@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}上传共享包 · VaultShare{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('web.packages') }}">← 返回包列表</a></p>
+<h1>上传共享包</h1>
+
+{% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+
+{% if not enabled %}
+<div class="panel">
+  <h2>网页上传未启用</h2>
+  <p>服务器当前没有开启网页上传。请设置环境变量后重启：</p>
+  <pre class="code">VAULTSHARE_WEB_UPLOAD=1</pre>
+  <p class="muted small">
+    启用后，Web 进程会接收发送方身份私钥文件与口令，并短暂接触 <code>K_pkg</code>，
+    这会削弱“Web 永远拿不到密钥”的边界。只建议在完全由你掌控的服务器上开启，
+    详细风险见 <code>docs/SECURITY.md</code>。关闭时请继续使用命令行
+    <code>vaultshare upload</code>。
+  </p>
+</div>
+{% else %}
+
+<div class="flash warn">
+  <strong>注意：</strong>网页上传会把 <code>sender.key</code> 和私钥口令发送到服务器，
+  由服务器进程解开 <code>K_pkg</code> 并生成口令。服务器因此会在内存中短暂接触
+  私钥与 <code>K_pkg</code>。临时文件在请求结束后删除，不会被写入审计日志。
+</div>
+
+<div class="panel">
+  <h2>选择文件</h2>
+  <form method="post" action="{{ url_for('web.upload') }}" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <label for="package_files">包文件（可多选）</label>
+    <input id="package_files" type="file" name="package_files" multiple required>
+    <p class="muted small">
+      选择加密工具输出目录里的 <code>upload-key.json</code>、<code>package.json</code>；
+      服务器交付时还要选 <code>payload.vspk</code>；如果包已经准备过，则选
+      <code>keyconfig.json</code> 与 <code>policy.json</code> 代替上传凭据。
+      发送方身份文件如果也在同一目录，可以一起选中。
+    </p>
+
+    <label class="check">
+      <input type="checkbox" name="local_payload" value="1"{% if form.local_payload %} checked{% endif %}>
+      本地交付：不上传密文（服务器只保存元数据与口令）
+    </label>
+    <p class="muted small">
+      勾选后服务器<strong>不接收</strong> <code>payload.vspk</code>：请不要在文件选择里放它，
+      浏览器仍会把选中的文件发给服务器。你需要自己把容器交给接收方；对方解密时
+      同时选择容器与口令。
+    </p>
+
+    <label for="identity_files">发送方身份文件（若不在上面的包文件里，可在此选择）</label>
+    <input id="identity_files" type="file" name="identity_files" multiple>
+    <p class="muted small">
+      需要成对的 <code>sender.json</code> 与 <code>sender.key</code>（各一个，文件名前缀可以不同）。
+      私钥文件使用创建身份时设置的口令加密。
+    </p>
+
+    <label for="identity_password">发送方私钥口令</label>
+    <input id="identity_password" type="password" name="identity_password" required autocomplete="off">
+
+    <label for="note">包备注（可选）</label>
+    <textarea id="note" name="note" rows="2" maxlength="500" placeholder="例如：给谁的、内容说明。只用于本页展示，不参与加密或授权。">{{ form.note or '' }}</textarea>
+
+    <div class="form-grid">
+      <div>
+        <label for="codes">本次生成口令数</label>
+        <input id="codes" type="text" name="codes" value="{{ form.codes or '1' }}" inputmode="numeric">
+      </div>
+      <div>
+        <label for="max_uses">每个口令可用次数</label>
+        <input id="max_uses" type="text" name="max_uses" value="{{ form.max_uses or '1' }}" inputmode="numeric">
+      </div>
+      <div>
+        <label for="max_codes">口令总数上限</label>
+        <input id="max_codes" type="text" name="max_codes" value="{{ form.max_codes or '50' }}" inputmode="numeric">
+        <p class="muted small">含以后在包详情页新增的口令；策略签名后无法再放宽。</p>
+      </div>
+      <div>
+        <label for="expires">有效期</label>
+        <input id="expires" type="text" name="expires" value="{{ form.expires or '7d' }}">
+        <p class="muted small">例如 12h、7d。上限与每个口令次数会写入签名策略。</p>
+      </div>
+    </div>
+    <p class="muted small">
+      如果包内已经带有 <code>keyconfig.json</code> 与 <code>policy.json</code>，
+      将复用其中已签名的策略，上面的数量、次数与有效期以包内策略为准。
+    </p>
+
+    <p class="muted small">
+      代理指纹：{% if broker_fingerprint %}<code>{{ broker_fingerprint }}</code>
+      {% else %}<span class="bad">代理不可用（{{ broker_error }}），上传会失败。</span>{% endif %}
+    </p>
+    <p class="muted small">
+      服务器地址写在容器里，接收方打开容器即可自动读取；本页不会改写它。
+      服务器交付时，上传前会用 <code>K_pkg</code> 完整验证一遍容器，失败不会创建
+      任何包；本地交付时服务器拿不到容器，因此无法做这一步，容器完整性由
+      发送方在加密时自行验证。
+    </p>
+
+    <button class="primary" type="submit">上传并生成口令</button>
+  </form>
+</div>
+
+{% if state.degraded %}
+<div class="flash error">状态处于降级模式：{{ state.reason }}。网页上传被拒绝。</div>
+{% endif %}
+{% endif %}
+{% endblock %}

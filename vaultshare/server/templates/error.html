@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}错误 {{ status }} · VaultShare{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>请求未完成</h1>
+  <p class="bad">状态码：{{ status }}</p>
+  <p>{{ message }}</p>
+  <p><a href="{{ url_for('web.index') }}">返回首页</a></p>
+</section>
+{% endblock %}

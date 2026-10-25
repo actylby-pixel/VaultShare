@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}概览 · VaultShare{% endblock %}
+{% block content %}
+<h1>共享包概览</h1>
+
+{% if initial_pending %}
+<div class="flash warn">
+  首次初始化凭据文件仍存在。阅读并保存后，请运行
+  <code>vaultshare admin ack-init</code> 删除它。
+</div>
+{% endif %}
+
+{% if state.degraded %}
+<div class="flash error">
+  <strong>状态处于降级模式：</strong>{{ state.reason }}。
+  兑换已暂停，系统不会自动重置授权或提升备份。请人工检查后执行
+  <code>vaultshare admin recover --from-journal|--from-backup --confirm</code>。
+</div>
+{% endif %}
+
+<div class="stats">
+  <div class="stat">
+    <span class="stat-label">共享包</span>
+    <span class="stat-value">{{ summary.packages_total }}</span>
+    <span class="stat-note">有效 {{ summary.packages_active }} · 未传文件 {{ summary.packages_pending }}</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">口令</span>
+    <span class="stat-value">{{ summary.grants_total }}</span>
+    <span class="stat-note">可用 {{ summary.grants_active }}</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">次数</span>
+    <span class="stat-value">{{ summary.used }}</span>
+    <span class="stat-note">已用 / 已分配 {{ summary.used }} / {{ summary.allocated_uses }}</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">发送方</span>
+    <span class="stat-value">{{ summary.senders_total }}</span>
+    <span class="stat-note">已撤销 {{ summary.senders_revoked }}</span>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="panel">
+    <h2>密钥代理</h2>
+    {% if broker_health.status == 'ok' %}
+    <p class="ok">运行中 · key_id <code>{{ broker_health.key_id }}</code></p>
+    <p class="muted small">指纹：<code>{{ broker_health.fingerprint }}</code></p>
+    {% else %}
+    <p class="bad">不可用（{{ broker_health.error or broker_health.status }}）。发码、兑换与交付会失败。</p>
+    {% endif %}
+    <p class="muted small">状态代数 {{ state.generation }} · {{ '降级' if state.degraded else '正常' }}</p>
+  </div>
+
+  <div class="panel">
+    <h2>快捷操作</h2>
+    <p class="actions">
+      {% if web_upload_enabled %}
+      <a class="button" href="{{ url_for('web.upload') }}">上传新共享包</a>
+      {% endif %}
+      <a class="button" href="{{ url_for('web.packages') }}">查看全部包</a>
+      <a class="button" href="{{ url_for('web.system') }}">系统状态</a>
+    </p>
+    {% if not web_upload_enabled %}
+    <p class="muted small">
+      网页上传未启用。设置 <code>VAULTSHARE_WEB_UPLOAD=1</code> 并重启服务后，
+      这里的“上传”入口会出现；启用后 Web 进程会接触发送方私钥与 <code>K_pkg</code>，
+      请先阅读 <code>docs/SECURITY.md</code>。
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel">
+  <h2>最近的包</h2>
+  {% if packages %}
+  <table>
+    <thead>
+      <tr>
+        <th>package_id</th>
+        <th>备注</th>
+        <th>状态</th>
+        <th>创建时间（UTC）</th>
+        <th>口令</th>
+        <th>已用 / 已分配</th>
+        <th>文件</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in packages %}
+      <tr>
+        <td><a href="{{ url_for('web.package_detail', package_id=p.package_id) }}"><code>{{ p.package_id }}</code></a></td>
+        <td class="note-cell" title="{{ p.note }}">{{ p.note }}</td>
+        <td>
+          {% if p.status == 'active' %}<span class="tag ok">有效</span>
+          {% else %}<span class="tag bad">{{ p.status }}</span>{% endif %}
+        </td>
+        <td>{{ p.created_text }}</td>
+        <td>{{ p.issued }}</td>
+        <td>{{ p.used }} / {{ p.allocated_uses }}</td>
+        <td>
+          {% if p.payload_mode == 'local' %}<span class="tag ok">本地交付</span>
+          {% elif p.has_payload %}<span class="tag ok">已上传</span>
+          {% else %}<span class="tag">未上传</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p><a href="{{ url_for('web.packages') }}">查看全部 {{ summary.packages_total }} 个包 →</a></p>
+  {% else %}
+  <p class="muted">
+    还没有共享包。{% if web_upload_enabled %}可以<a href="{{ url_for('web.upload') }}">直接在网页上传</a>，
+    也可以使用命令行客户端。{% else %}使用命令行客户端上传后会显示在这里。{% endif %}
+  </p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>最近事件</h2>
+  {% if events %}
+  <ul class="events">
+    {% for e in events %}
+    <li>
+      <span class="muted small">{{ e.ts_text }}</span>
+      <strong>{{ e.event }}</strong>
+      {% if e.package_id %}<code>{{ e.package_id }}</code>{% endif %}
+      {% if e.count is defined %}<span class="small">× {{ e.count }}</span>{% endif %}
+      {% if e.by %}<span class="small muted">by {{ e.by }}</span>{% endif %}
+      {% if e.ip %}<span class="small muted">{{ e.ip }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <p><a href="{{ url_for('web.audit') }}">查看完整审核日志 →</a></p>
+  {% else %}
+  <p class="muted">暂无事件。</p>
+  {% endif %}
+</div>
+{% endblock %}

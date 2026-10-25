@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}已新增口令 · VaultShare{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('web.package_detail', package_id=result.package_id) }}">← 返回包详情</a></p>
+<h1>已新增口令</h1>
+
+<div class="flash ok">
+  新口令已经生成。<strong>明文口令只显示这一次</strong>，离开本页后需要在本机用
+  发送方私钥重新解开，请现在保存或复制。
+</div>
+
+<div class="panel">
+  <h2>新口令</h2>
+  <form method="post" action="{{ url_for('web.update_grant_notes', package_id=result.package_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <table>
+      <thead>
+        <tr>
+          <th>口令</th>
+          <th>次数</th>
+          <th>到期（UTC）</th>
+          <th>grant_id</th>
+          <th>备注</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in result.codes %}
+        <tr>
+          <td><code class="code-value">{{ c.formatted }}</code></td>
+          <td>{{ c.used }} / {{ c.max_uses }}</td>
+          <td>{{ c.expires_text }}</td>
+          <td><code>{{ c.grant_id }}</code></td>
+          <td><input type="text" name="note_{{ c.grant_id }}" maxlength="500" placeholder="可选"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button class="small" type="submit">保存这些备注</button>
+    <p class="muted small">
+      保存后会跳到包详情页，<strong>明文口令不会再次显示</strong>，请先复制口令。
+    </p>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>说明</h2>
+  <dl class="kv">
+    <dt>package_id</dt><dd><code>{{ result.package_id }}</code></dd>
+    <dt>本次批次</dt><dd><code>{{ result.batch_id }}</code></dd>
+    <dt>新增数量</dt><dd>{{ result.codes|length }}</dd>
+  </dl>
+  <p class="muted small">
+    新增口令受签名策略的“口令总数上限”约束；如果提示超过上限，需要重新上传一个
+    预留了更大上限的包。
+  </p>
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}发送方 · VaultShare{% endblock %}
+{% block content %}
+<h1>发送方身份</h1>
+
+<div class="panel">
+  <h2>已注册身份（{{ senders|length }}）</h2>
+  {% if senders %}
+  <table>
+    <thead>
+      <tr>
+        <th>发送方 key_id</th>
+        <th>身份指纹</th>
+        <th>注册时间（UTC）</th>
+        <th>包</th>
+        <th>状态</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in senders %}
+      <tr>
+        <td><code>{{ s.sender_key_id }}</code></td>
+        <td><code class="wrap">{{ s.identity_hash }}</code></td>
+        <td>{{ s.registered_text }}</td>
+        <td>{{ s.package_count }}</td>
+        <td>
+          {% if s.revoked %}<span class="tag bad">已撤销</span>
+          {% else %}<span class="tag ok">有效</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">
+    接收方首次使用时应通过可信渠道核对这里的身份指纹；服务器不能代替这一步。
+  </p>
+  {% else %}
+  <p class="muted">还没有注册发送方身份。上传时会自动注册。</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>命令行</h2>
+  <pre class="code">vaultshare identity init --path sender
+vaultshare identity show --path sender
+vaultshare identity register --path sender --server URL</pre>
+</div>
+{% endblock %}

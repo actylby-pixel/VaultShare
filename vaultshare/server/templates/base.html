@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>{% block title %}VaultShare{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">VaultShare <span class="ver">v{{ app_version }}</span></div>
+    {% if g.get('vaultshare_session') %}
+    <nav>
+      <a href="{{ url_for('web.index') }}">概览</a>
+      <a href="{{ url_for('web.packages') }}">共享包</a>
+      {% if web_upload_enabled %}<a href="{{ url_for('web.upload') }}">上传</a>{% endif %}
+      <a href="{{ url_for('web.senders') }}">发送方</a>
+      <a href="{{ url_for('web.audit') }}">审核日志</a>
+      <a href="{{ url_for('web.system') }}">系统</a>
+      <form class="inline" method="post" action="{{ url_for('web.logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="link">退出登录</button>
+      </form>
+    </nav>
+    {% endif %}
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flashes">
+      {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="foot">
+    <p>VaultShare v1 · 本地 JSON 状态 · 密钥代理独立进程</p>
+    <p class="muted">服务器永远拿不到明文口令（网页上传为显式开启的例外，见系统页）。</p>
+  </footer>
+</body>
+</html>

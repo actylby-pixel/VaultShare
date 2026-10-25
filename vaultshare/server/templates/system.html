@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}系统 · VaultShare{% endblock %}
+{% block content %}
+<h1>系统状态</h1>
+
+{% if state.degraded %}
+<div class="flash error">
+  <strong>降级模式：</strong>{{ state.reason }}。兑换与网页上传已暂停。
+  请按 <code>docs/STATE.md</code> 人工恢复，不要删除状态文件。
+</div>
+{% else %}
+<div class="flash ok">状态文件有效 · generation {{ state.generation }}</div>
+{% endif %}
+
+<div class="grid-2">
+  <div class="panel">
+    <h2>服务</h2>
+    <dl class="kv">
+      <dt>版本</dt><dd>{{ app_version }}</dd>
+      <dt>监听</dt><dd>{{ settings.host }}:{{ settings.port }}</dd>
+      <dt>HTTPS 模式</dt><dd>{{ '是（代理终结 TLS）' if settings.https else '否' }}</dd>
+      <dt>URL 前缀</dt><dd><code>{{ settings.url_prefix or '（根路径）' }}</code></dd>
+      <dt>网页上传</dt><dd>{{ '已启用' if settings.web_upload else '未启用' }}</dd>
+      <dt>上传上限</dt><dd>{{ settings.upload_max_bytes }} 字节</dd>
+      <dt>数据目录</dt><dd><code>{{ settings.data_dir }}</code></dd>
+    </dl>
+  </div>
+
+  <div class="panel">
+    <h2>密钥代理</h2>
+    {% if broker.status == 'ok' %}
+    <p class="ok">运行中</p>
+    <dl class="kv">
+      <dt>key_id</dt><dd><code>{{ broker_identity.key_id }}</code></dd>
+      <dt>指纹</dt><dd><code class="wrap">{{ broker_identity.fingerprint }}</code></dd>
+      <dt>监听</dt><dd>{{ settings.broker_host }}:{{ settings.broker_port }}</dd>
+    </dl>
+    {% else %}
+    <p class="bad">不可用（{{ broker.error or broker.status }}）</p>
+    <p class="muted small">发码、兑换与交付都会失败。请先启动 <code>vaultshare broker run</code>。</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel">
+  <h2>密钥文件</h2>
+  <table>
+    <thead><tr><th>文件</th><th>状态</th></tr></thead>
+    <tbody>
+      {% for item in secrets_info %}
+      <tr>
+        <td>{{ item.name }}</td>
+        <td>{% if item.exists %}<span class="tag ok">存在</span>{% else %}<span class="tag bad">缺失</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">
+    密钥文件位于 <code>data/secrets/</code>，内容不会显示在网页上。不要把它们放进备份以外的地方。
+  </p>
+</div>
+
+<div class="panel">
+  <h2>命令行维护</h2>
+  <pre class="code">vaultshare admin status
+vaultshare admin backup
+vaultshare admin passwd
+vaultshare admin ack-init
+vaultshare broker rotate</pre>
+  <p class="muted small">
+    网页上传的安全边界说明见 <code>docs/SECURITY.md</code>；状态文件与恢复流程见
+    <code>docs/STATE.md</code>。
+  </p>
+</div>
+{% endblock %}

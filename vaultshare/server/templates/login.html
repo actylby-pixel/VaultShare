@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}登录 · VaultShare{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>登录</h1>
+  <p class="muted">需要用户名、密码与认证器中的 6 位动态验证码。</p>
+
+  {% if initial_pending %}
+  <div class="flash warn">
+    首次初始化凭据尚未确认。请读取服务器上的
+    <code>data/secrets/INITIAL_CREDENTIALS.txt</code>，保存后运行
+    <code>vaultshare admin ack-init</code> 删除该文件。
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="flash error" role="alert">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('web.login', next=next_target) }}" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="username">用户名</label>
+    <input id="username" name="username" type="text" autocomplete="username"
+           maxlength="64" required autofocus>
+
+    <label for="password">密码</label>
+    <input id="password" name="password" type="password" autocomplete="current-password"
+           maxlength="256" required>
+
+    <label for="totp">动态验证码</label>
+    <input id="totp" name="totp" type="text" inputmode="numeric" pattern="[0-9]{6}"
+           autocomplete="one-time-code" maxlength="6" required>
+
+    <button type="submit" class="primary">登录</button>
+  </form>
+
+  <p class="muted small">同一验证码不能重复使用；连续失败会触发临时锁定。</p>
+</section>
+{% endblock %}

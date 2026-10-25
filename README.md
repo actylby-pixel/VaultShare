@@ -67,12 +67,10 @@ ff/
 
 要求 Python 3.11+、Windows 或 Linux、本地磁盘（不支持 NFS/SMB 共享状态）。
 
-```powershell
-cd E:\Python_idea\加密库\ff
-..\key\Scripts\python.exe -m pip install -r requirements.txt
+python.exe -m pip install -r requirements.txt
 
 # 需要图形界面时（可选）
-..\key\Scripts\python.exe -m pip install -r requirements-gui.txt
+python.exe -m pip install -r requirements-gui.txt
 ```
 
 `cryptography` 固定为 `50.0.2`：HPKE API 的 `info` 语义在该版本上经过测试。
@@ -84,14 +82,11 @@ cd E:\Python_idea\加密库\ff
 
 ### 3.1 启动服务与代理
 
-```powershell
-cd E:\Python_idea\加密库\ff
-
 # 终端 1：Web 服务（首次启动会生成账号、随机密码、TOTP 密钥）
-..\key\Scripts\python.exe -m vaultshare.cli server run --host 127.0.0.1 --port 5000
+python.exe -m vaultshare.cli server run --host 127.0.0.1 --port 5000
 
 # 终端 2：密钥代理
-..\key\Scripts\python.exe -m vaultshare.cli broker run
+python.exe -m vaultshare.cli broker run
 ```
 
 - 首次启动生成用户名 `admin`、24 字符随机密码、TOTP 密钥。
@@ -180,9 +175,9 @@ $env:VAULTSHARE_CA_FILE = "E:\certs\server.crt"
 ### 4.2 创建并注册发送方身份
 
 ```powershell
-..\key\Scripts\python.exe -m vaultshare.cli identity init --path sender
-..\key\Scripts\python.exe -m vaultshare.cli identity show --path sender
-..\key\Scripts\python.exe -m vaultshare.cli identity register --path sender `
+python.exe -m vaultshare.cli identity init --path sender
+python.exe -m vaultshare.cli identity show --path sender
+python.exe -m vaultshare.cli identity register --path sender `
   --server http://127.0.0.1:5000
 ```
 
@@ -193,7 +188,7 @@ $env:VAULTSHARE_CA_FILE = "E:\certs\server.crt"
 ### 4.3 只加密（推荐）
 
 ```powershell
-..\key\Scripts\python.exe -m vaultshare.cli encrypt .\资料 `
+python.exe -m vaultshare.cli encrypt .\资料 `
   --identity sender `
   --server http://127.0.0.1:5000 `
   --out .\pkg
@@ -238,7 +233,7 @@ $env:VAULTSHARE_CA_FILE = "E:\certs\server.crt"
 可选写出分享卡片（默认不含口令）：
 
 ```powershell
-..\key\Scripts\python.exe -m vaultshare.cli upload .\pkg `
+python.exe -m vaultshare.cli upload .\pkg `
   --identity sender --server http://127.0.0.1:5000 `
   --broker-identity broker-identity.json `
   --codes 2 --max-uses 3 --expires 7d `
@@ -248,7 +243,7 @@ $env:VAULTSHARE_CA_FILE = "E:\certs\server.crt"
 之后可随时查看：
 
 ```powershell
-..\key\Scripts\python.exe -m vaultshare.cli codes `
+python.exe -m vaultshare.cli codes `
   --package <package_id> --identity sender --server http://127.0.0.1:5000
 ```
 
@@ -326,7 +321,7 @@ Policy 与口令，**完全不接收密文**；发送方自己把 `payload.vspk`
 ### 4.6 接收方兑换
 
 ```powershell
-..\key\Scripts\python.exe -m vaultshare.cli redeem `
+python.exe -m vaultshare.cli redeem `
   --package <package_id> --code XXXXXXXXX-... `
   --out .\解包目录 `
   --server http://127.0.0.1:5000 `
@@ -347,7 +342,7 @@ Policy 与口令，**完全不接收密文**；发送方自己把 `payload.vspk`
 （`--local-payload` 上传）必须另外给出发送方的容器：
 
 ```powershell
-..\key\Scripts\python.exe -m vaultshare.cli redeem `
+python.exe -m vaultshare.cli redeem `
   --package <package_id> --code XXXXXXXXX-... `
   --out .\解包目录 --container .\payload.vspk `
   --server http://127.0.0.1:5000 `
@@ -369,8 +364,8 @@ Policy 与口令，**完全不接收密文**；发送方自己把 `payload.vspk`
 安装 `requirements-gui.txt` 后，在 `ff/` 目录分别运行：
 
 ```powershell
-..\key\Scripts\python.exe encrypt_tool.py   # 加密工具
-..\key\Scripts\python.exe decrypt_tool.py   # 解密工具
+python.exe encrypt_tool.py   # 加密工具
+python.exe decrypt_tool.py   # 解密工具
 ```
 
 也可以运行 `python -m vaultshare.gui.encrypt_tool` 或
@@ -412,63 +407,7 @@ Policy 与口令，**完全不接收密文**；发送方自己把 `payload.vspk`
 可以改写它们。需要防止服务器冒充发送方时，仍应通过可信渠道核对发送方指纹
 （或让发送方勾选该选项）。
 
-**打包成两个 exe**（需先安装 PyInstaller）：
 
-```powershell
-.\key\Scripts\python.exe -m pip install pyinstaller
-
-# 在仓库根目录执行；默认把 qrlink.crt 一起打进解密工具
-.\ff\tools\build_exe.ps1                 # 同时构建加密 + 解密
-.\ff\tools\build_exe.ps1 -Tool decrypt   # 只构建解密工具
-```
-
-输出在 `ff\dist\`：`VaultShare解密.exe`、`VaultShare加密.exe`。两个 exe 共用同一
-套 Python 依赖，但互不依赖对方的窗口代码。
-
-自签名证书的处理：构建脚本把证书作为资源打进 exe，运行时作为**默认信任锚**，
-接收方只拿到 exe 就能连接，不需要证书文件、不需要环境变量。优先级：
-
-1. 命令行 `--ca-file`；
-2. 环境变量 `VAULTSHARE_CA_FILE`；
-3. exe 内置的 `qrlink.crt`；
-4. 都没指定时使用系统根证书（自签名服务器会失败）。
-
-因此**换证书后必须重新打包 exe**；已经在用的旧 exe 仍信任旧证书。想临时覆盖，
-可以给接收方的系统设置 `VAULTSHARE_CA_FILE` 指向新证书，不必重新打包。
-
----
-
-## 5. 命令行参考
-
-```text
-vaultshare server run [--host H] [--port P] [--print-init-secrets]
-vaultshare broker run
-vaultshare broker info --server URL [--fingerprint SHA256] --out FILE
-vaultshare broker rotate
-vaultshare identity init|show|register --path PREFIX ...
-vaultshare encrypt SRC --identity PREFIX --server URL --out DIR
-vaultshare pack DIR --identity PREFIX --broker-identity FILE --out DIR
-                 [--server URL] [--codes N] [--max-uses N] [--expires 7d]
-python encrypt_tool.py                 加密工具（需 requirements-gui.txt）
-python decrypt_tool.py                 解密工具（需 requirements-gui.txt）
-vaultshare upload PACKAGE --server URL --identity PREFIX ...
-                 [--broker-identity FILE] [--broker-fingerprint SHA256]
-                 [--codes N] [--max-uses N] [--expires 7d]
-                 [--card FILE] [--card-include-code]
-vaultshare codes --package ID --server URL --identity PREFIX ...
-vaultshare redeem --package ID --code C --out DIR --server URL
-                  --sender-fingerprint SHA256 [--broker-fingerprint SHA256]
-vaultshare admin status
-vaultshare admin backup
-vaultshare admin recover --from-journal|--from-backup --confirm
-vaultshare admin passwd [--old-password ...] [--new-password ...]
-vaultshare admin ack-init
-```
-
-登录参数（`upload` / `codes` / `identity register`）：`--username`、
-`--password`、`--totp`。推荐用环境变量或交互输入，避免密码进入进程列表。
-
----
 
 ## 6. 数据结构
 
@@ -516,7 +455,7 @@ vaultshare admin ack-init
 ### 修改密码
 
 ```powershell
-..\key\Scripts\python.exe -m vaultshare.cli admin passwd
+python.exe -m vaultshare.cli admin passwd
 ```
 
 修改成功后 `api_epoch` 递增，所有旧 Bearer token 立即失效。
@@ -524,7 +463,7 @@ vaultshare admin ack-init
 ### 排障
 
 ```powershell
-..\key\Scripts\python.exe -m vaultshare.cli admin status
+python.exe -m vaultshare.cli admin status
 ```
 
 显示 generation、包/授权/请求数量、当前代理密钥与代理健康状态。状态降级、
@@ -553,16 +492,16 @@ Cookie 缺失还是页面过期。
 
 ```powershell
 # 在仓库根目录
-.\key\Scripts\python.exe -m unittest discover -s ff\tests
+python.exe -m unittest discover -s ff\tests
 
 # 完整端到端（自行选择空闲端口，使用临时 VAULTSHARE_DATA）
-.\key\Scripts\python.exe ff\tools\e2e_check.py
+python.exe ff\tools\e2e_check.py
 
 # GUI 动作层全链路（不创建窗口，验证加密/上传/卡片/解密）
-.\key\Scripts\python.exe ff\tools\gui_flow_check.py
+python.exe ff\tools\gui_flow_check.py
 
 # 旧桌面应用回归（与本服务无关，验证删除分享模块后无回归）
-.\key\Scripts\python.exe -m unittest discover -s tests
+python.exe -m unittest discover -s tests
 ```
 
 覆盖范围包括：
